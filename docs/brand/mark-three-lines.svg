@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Haiku&amp;Hue: Three lines</title>
+  <desc id="desc">Three ink strokes in a five-seven-five width ratio over a circular wash of rose, apricot, and sage, on warm paper.</desc>
+  <defs>
+    <linearGradient id="hue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#C98578"/>
+      <stop offset=".5" stop-color="#DFB77B"/>
+      <stop offset="1" stop-color="#8BA888"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="#F7EFE2"/>
+  <circle cx="128" cy="128" r="78" fill="url(#hue)"/>
+  <g fill="#2F2925">
+    <rect x="88" y="93" width="80" height="14" rx="7"/>
+    <rect x="72" y="121" width="112" height="14" rx="7"/>
+    <rect x="88" y="149" width="80" height="14" rx="7"/>
+  </g>
+</svg>
