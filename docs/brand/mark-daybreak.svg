@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Haiku&amp;Hue: Daybreak almanac</title>
+  <desc id="desc">A rose-colored sun rises above the pages of an open book, drawn in ink with sage and apricot page washes.</desc>
+  <rect width="256" height="256" rx="56" fill="#F7EFE2"/>
+  <circle cx="128" cy="93" r="39" fill="#C98578"/>
+  <path d="M55 109C83 104 109 113 128 133V195C106 174 81 166 55 171Z" fill="#DFB77B"/>
+  <path d="M128 133C149 113 174 104 201 109V171C174 166 149 174 128 195Z" fill="#8BA888"/>
+  <g fill="none" stroke="#2F2925" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M55 109C83 104 109 113 128 133C149 113 174 104 201 109V171C174 166 149 174 128 195C106 174 81 166 55 171Z"/>
+    <path d="M128 133V195M76 133C88 134 99 138 109 144M76 151C88 152 99 156 109 162M147 144C157 138 169 134 181 133"/>
+  </g>
+</svg>

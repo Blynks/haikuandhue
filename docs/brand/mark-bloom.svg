@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Haiku&amp;Hue: Color in bloom</title>
+  <desc id="desc">Three overlapping petals in rose, apricot, and sage gather around an ink-colored center, suggesting feelings becoming color.</desc>
+  <rect width="256" height="256" rx="56" fill="#F7EFE2"/>
+  <path d="M128 158C80 140 68 81 128 43C188 81 176 140 128 158Z" fill="#C98578"/>
+  <path d="M128 158C119 111 165 80 218 105C223 168 171 194 128 158Z" fill="#DFB77B"/>
+  <path d="M128 158C85 194 33 168 38 105C91 80 137 111 128 158Z" fill="#8BA888"/>
+  <path d="M128 158V202" fill="none" stroke="#2F2925" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="128" cy="153" r="10" fill="#2F2925"/>
+</svg>

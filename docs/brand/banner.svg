@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-labelledby="title desc">
+  <title id="title">Haiku&amp;Hue</title>
+  <desc id="desc">A feeling. Three lines. A little color. An editorial wordmark on warm paper alongside three ink strokes over a rose, apricot, and sage color wash.</desc>
+  <defs>
+    <linearGradient id="hue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#C98578"/>
+      <stop offset=".5" stop-color="#DFB77B"/>
+      <stop offset="1" stop-color="#8BA888"/>
+    </linearGradient>
+    <clipPath id="paper">
+      <rect width="1280" height="420" rx="24"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#paper)">
+    <rect width="1280" height="420" fill="#F7EFE2"/>
+    <circle cx="1190" cy="46" r="234" fill="#EAD9C4" opacity=".45"/>
+    <circle cx="1172" cy="405" r="206" fill="#8BA888" opacity=".12"/>
+    <g fill="none" stroke="#2F2925" opacity=".08">
+      <circle cx="1016" cy="210" r="148"/>
+      <circle cx="1016" cy="210" r="166"/>
+      <circle cx="1016" cy="210" r="184"/>
+    </g>
+    <rect x="20.5" y="20.5" width="1239" height="379" rx="12" fill="none" stroke="#C7B7A5"/>
+    <text x="72" y="89" fill="#75675C" font-family="Arial, Helvetica, sans-serif" font-size="13" letter-spacing="3.5">A DAILY CREATIVE RITUAL</text>
+    <text x="68" y="207" fill="#2F2925" font-family="Georgia, 'Times New Roman', serif" font-size="92" letter-spacing="-4">Haiku<tspan fill="#A66559" font-style="italic">&amp;</tspan>Hue</text>
+    <text x="74" y="259" fill="#75675C" font-family="Georgia, 'Times New Roman', serif" font-size="25" font-style="italic">A feeling. Three lines. A little color.</text>
+    <path d="M74 315H124" fill="none" stroke="#A66559" stroke-width="2"/>
+    <text x="142" y="320" fill="#75675C" font-family="Arial, Helvetica, sans-serif" font-size="12" letter-spacing="2">POETRY, WITH ROOM TO BREATHE.</text>
+    <circle cx="1016" cy="210" r="110" fill="url(#hue)"/>
+    <g fill="#2F2925">
+      <rect x="960" y="161" width="112" height="20" rx="10"/>
+      <rect x="937.6" y="200" width="156.8" height="20" rx="10"/>
+      <rect x="960" y="239" width="112" height="20" rx="10"/>
+    </g>
+  </g>
+</svg>
