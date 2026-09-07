@@ -66,6 +66,7 @@ async function requireOwnedRevision(revisionId: string) {
 }
 
 export async function getStudioSnapshot() {
+  if (!(await isAuthenticated())) redirect("/login");
   if (!(await canUseDatabase())) return demoSnapshot();
   await ensureSeedData();
   const user = await prisma.user.findUniqueOrThrow({ where: { email: userEmail } });
@@ -123,23 +124,26 @@ export async function createMixedRevisionAction(formData: FormData) {
   const poemId = String(formData.get("poemId"));
   const backgroundId = String(formData.get("backgroundId"));
   const checkInId = String(formData.get("checkInId"));
-  const [poem, background, , count] = await Promise.all([
+  const [poem, background] = await Promise.all([
     prisma.poem.findFirstOrThrow({ where: { id: poemId, checkInId } }),
     prisma.background.findFirstOrThrow({ where: { id: backgroundId, checkInId } }),
-    prisma.moodCheckIn.findFirstOrThrow({ where: { id: checkInId, userId: user.id } }),
-    prisma.artworkRevision.count({ where: { checkInId } })
+    prisma.moodCheckIn.findFirstOrThrow({ where: { id: checkInId, userId: user.id } })
   ]);
-  await prisma.artworkRevision.create({
-    data: {
-      checkInId,
-      poemId,
-      backgroundId,
-      revisionNumber: count + 1,
-      immutableSnapshot: makeSnapshot(poem.lines, background.svgTemplate, defaultTypography, [], null),
-      typography: defaultTypography,
-      caption: poem.caption,
-      altText: poem.altText
-    }
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${checkInId}))`;
+    const latest = await tx.artworkRevision.findFirst({ where: { checkInId }, orderBy: { revisionNumber: "desc" }, select: { revisionNumber: true } });
+    await tx.artworkRevision.create({
+      data: {
+        checkInId,
+        poemId,
+        backgroundId,
+        revisionNumber: (latest?.revisionNumber ?? 0) + 1,
+        immutableSnapshot: makeSnapshot(poem.lines, background.svgTemplate, defaultTypography, [], null),
+        typography: defaultTypography,
+        caption: poem.caption,
+        altText: poem.altText
+      }
+    });
   });
   revalidatePath("/review");
 }
@@ -167,7 +171,7 @@ export async function updateRevisionAction(formData: FormData) {
       typography: typography as Prisma.InputJsonValue,
       caption: caption || revision.caption,
       altText: altText || revision.altText,
-      deliveries: { updateMany: { where: {}, data: { status: "CANCELLED", lastError: "Approval invalidated by edit." } } }
+      deliveries: { updateMany: { where: { status: { in: ["NOT_STARTED", "SCHEDULED", "FAILED_NEEDS_REVIEW"] } }, data: { status: "CANCELLED", lastError: "Approval invalidated by edit." } } }
     }
   });
   revalidatePath("/review");
@@ -175,7 +179,8 @@ export async function updateRevisionAction(formData: FormData) {
 
 export async function approveRevisionAction(formData: FormData) {
   const revisionId = String(formData.get("revisionId"));
-  const scheduledFor = new Date(String(formData.get("scheduledFor") || new Date(Date.now() + 60 * 60 * 1000).toISOString()));
+  const requestedSchedule = new Date(String(formData.get("scheduledFor") || ""));
+  const scheduledFor = Number.isNaN(requestedSchedule.getTime()) ? new Date(Date.now() + 60 * 60 * 1000) : requestedSchedule;
   const destinationSlugs = formData.getAll("destinations").map(String);
   const { revision } = await requireOwnedRevision(revisionId);
   const destinations = await prisma.destination.findMany({ where: { slug: { in: destinationSlugs.length ? destinationSlugs : ["manual-export"] } } });

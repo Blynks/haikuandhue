@@ -20,7 +20,7 @@ const palettes: Record<string, Palette[]> = {
 export function pickPalette(feelings: string[], intensity: number, direction: string): Palette {
   const key = direction === "CONTRAST" || intensity > 7 ? "vivid" : feelings.some((f) => ["calm", "tender", "hopeful"].includes(f)) ? "cool" : "warm";
   const list = palettes[key];
-  return list[Math.abs(feelings.join("").length + intensity) % list.length];
+  return list[(feelings.join("").length + intensity) % list.length];
 }
 
 export function makeBackgroundSvg(palette: Palette, style: VisualStyle | string, seed: number): string {

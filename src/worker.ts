@@ -23,7 +23,8 @@ async function processOne() {
     await prisma.queueJob.update({ where: { id: job.id }, data: { status: QueueStatus.COMPLETED } });
     return true;
   } catch (error) {
-    await prisma.queueJob.update({ where: { id: job.id }, data: { status: QueueStatus.FAILED, payload: { ...job.payload as object, error: error instanceof Error ? error.message : "Unknown worker error" } } });
+    const originalPayload = job.payload && typeof job.payload === "object" && !Array.isArray(job.payload) ? job.payload : { original: job.payload };
+    await prisma.queueJob.update({ where: { id: job.id }, data: { status: QueueStatus.FAILED, payload: { ...originalPayload, error: error instanceof Error ? error.message : "Unknown worker error" } } });
     return true;
   }
 }
@@ -37,4 +38,9 @@ async function main() {
   } while (true);
 }
 
-main().finally(async () => prisma.$disconnect());
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(async () => prisma.$disconnect());
