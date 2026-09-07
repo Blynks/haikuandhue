@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Session {
+  id        String   @id
+  ownerId   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([ownerId])
+}
+
+model LoginAttempt {
+  id        String   @id
+  count     Int      @default(0)
+  windowAt  DateTime @default(now())
+}
+
+model CreativeDefaults {
+  ownerId          String   @id
+  timezone         String   @default("UTC")
+  haikuCount       Int      @default(3)
+  artCount         Int      @default(3)
+  guidance         Json
+  dailyBudgetCents Int      @default(50)
+  localOnly        Boolean  @default(true)
+  publishingPaused Boolean  @default(false)
+  remindersEnabled Boolean  @default(false)
+  generationEnabled Boolean @default(false)
+  neutralOptIn     Boolean  @default(false)
+  reminderTime     String   @default("09:00")
+  generationTime   String   @default("09:30")
+  cutoffTime       String   @default("21:00")
+  updatedAt        DateTime @updatedAt
+}
+
+model DailyEntry {
+  id                  String   @id @default(cuid())
+  ownerId             String
+  localDate           String
+  timezone            String
+  feelings            String[]
+  intensity           Int?
+  privateNotes        String   @default("")
+  publicInspiration   String   @default("")
+  permissionToUse     Boolean  @default(false)
+  guidance            Json
+  inputProvided       Boolean  @default(true)
+  selectedCandidateId String?
+  history             String[] @default([])
+  historyIndex        Int      @default(-1)
+  archivedAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  @@unique([ownerId, localDate])
+  @@index([ownerId, createdAt])
+}
+
+model GenerationRequest {
+  id             String   @id @default(cuid())
+  ownerId        String
+  entryId        String
+  clientKey      String
+  haikuCount     Int
+  artCount       Int
+  completedHaiku Int      @default(0)
+  completedArt   Int      @default(0)
+  guidance       Json
+  brief          Json
+  locks          Json
+  sourcePoemId   String?
+  sourceArtId    String?
+  scope          String
+  provider       String
+  estimateCents  Int
+  localDate      String
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  @@unique([ownerId, clientKey])
+  @@index([ownerId, localDate])
+}
+
+model GenerationOutput {
+  id        String   @id @default(cuid())
+  requestId String
+  ownerId   String
+  kind      String
+  ordinal   Int
+  state     String   @default("pending")
+  attempts  Int      @default(0)
+  error     String?
+  revisionId String?
+  startedAt DateTime?
+  updatedAt DateTime @updatedAt
+  @@unique([requestId, kind, ordinal])
+  @@index([state])
+}
+
+model HaikuRevision {
+  id          String   @id @default(cuid())
+  ownerId     String
+  entryId     String
+  parentId    String?
+  lines       String[]
+  caption     String
+  metadata    Json
+  interpretation String?
+  createdAt   DateTime @default(now())
+  @@index([ownerId, entryId])
+}
+
+model ArtworkRevision {
+  id         String   @id @default(cuid())
+  ownerId    String
+  entryId    String
+  parentId   String?
+  assetId    String
+  source     Json
+  provenance String
+  createdAt  DateTime @default(now())
+  @@index([ownerId, entryId])
+}
+
+model CandidateRevision {
+  id          String   @id @default(cuid())
+  ownerId     String
+  entryId     String
+  parentId    String?
+  poemId      String
+  artId       String
+  lines       String[]
+  caption     String
+  alt         String
+  layout      Json
+  locks       Json
+  meterOverride Boolean @default(false)
+  createdAt   DateTime @default(now())
+  @@index([ownerId, entryId])
+}
+
+model Asset {
+  id         String   @id @default(cuid())
+  ownerId    String
+  sha256     String
+  key        String   @unique
+  mime       String
+  width      Int
+  height     Int
+  provenance String
+  license    String
+  createdAt  DateTime @default(now())
+  @@index([ownerId])
+}
+
+model RenderReview {
+  id          String   @id @default(cuid())
+  ownerId     String
+  entryId     String
+  candidateId String
+  manifest    Json
+  digest      String
+  createdAt   DateTime @default(now())
+  @@index([ownerId, entryId])
+}
+
+model Approval {
+  id          String   @id @default(cuid())
+  ownerId     String
+  entryId     String
+  candidateId String
+  reviewId    String   @unique
+  manifest    Json
+  digest      String
+  actorId     String
+  approvedAt  DateTime @default(now())
+  expiresAt   DateTime
+  cancelledAt DateTime?
+  @@index([ownerId, entryId])
+}
+
+model Publication {
+  id          String   @id @default(cuid())
+  ownerId     String
+  approvalId  String
+  destination String
+  account     String
+  scheduledAt DateTime
+  state       String   @default("approved")
+  attempts    Int      @default(0)
+  result      String?
+  remoteId    String?
+  submittedAt DateTime?
+  updatedAt   DateTime @updatedAt
+  @@unique([approvalId, destination, account])
+  @@index([ownerId])
+}
+
+model SocialConnection {
+  id             String   @id @default(cuid())
+  ownerId        String
+  provider       String
+  account        String
+  scopes         String[]
+  encryptedTokenRef String?
+  state          String   @default("planned")
+  @@unique([ownerId, provider, account])
+}
+
+model DailyRun {
+  id         String   @id @default(cuid())
+  ownerId    String
+  localDate  String
+  kind       String
+  timezone   String
+  createdAt  DateTime @default(now())
+  @@unique([ownerId, localDate, kind])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  ownerId   String
+  localDate String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  @@unique([ownerId, localDate])
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  ownerId   String
+  action    String
+  targetId  String?
+  createdAt DateTime @default(now())
+  @@index([ownerId, createdAt])
+}

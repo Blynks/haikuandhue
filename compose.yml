@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: haiku
+      POSTGRES_USER: haiku
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong database password}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U haiku -d haiku"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  web:
+    profiles: ["app"]
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set the web database URL using host db}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      MEDIA_DRIVER: local
+      MEDIA_LOCAL_PATH: /app/data/media
+      TEXT_PROVIDER: ${TEXT_PROVIDER:-demo}
+      TEXT_COST_CENTS: ${TEXT_COST_CENTS:-2}
+      TEXT_API_URL: ${TEXT_API_URL:-}
+      TEXT_API_ALLOWED_HOST: ${TEXT_API_ALLOWED_HOST:-}
+      TEXT_API_KEY: ${TEXT_API_KEY:-}
+      TEXT_MODEL: ${TEXT_MODEL:-}
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - media_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+  worker:
+    profiles: ["app"]
+    build: .
+    command: ["npm", "run", "worker"]
+    environment:
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?Use the restricted haiku_worker role and host db}
+      MEDIA_DRIVER: local
+      MEDIA_LOCAL_PATH: /app/data/media
+      TEXT_PROVIDER: ${TEXT_PROVIDER:-demo}
+      TEXT_COST_CENTS: ${TEXT_COST_CENTS:-2}
+      TEXT_API_URL: ${TEXT_API_URL:-}
+      TEXT_API_ALLOWED_HOST: ${TEXT_API_ALLOWED_HOST:-}
+      TEXT_API_KEY: ${TEXT_API_KEY:-}
+      TEXT_MODEL: ${TEXT_MODEL:-}
+      NOTIFICATION_DRIVER: inbox
+    volumes:
+      - media_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  postgres_data:
+  media_data:
