@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EmotionalDirection {
+  REFLECT
+  LIFT
+  CONTRAST
+}
+
+enum VisualStyle {
+  PAPER_GARDEN
+  DUSK_GRADIENT
+  PLAYFUL_SHAPES
+  QUIET_SEA
+}
+
+enum RevisionStatus {
+  DRAFT
+  APPROVED
+  SCHEDULED
+  REJECTED
+  CANCELLED
+  PUBLISHED
+  FAILED
+}
+
+enum QueueStatus {
+  PENDING
+  CLAIMED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum DestinationState {
+  PLANNED
+  CONNECTED
+  BLOCKED
+  MANUAL_EXPORT
+}
+
+enum DeliveryStatus {
+  NOT_STARTED
+  SCHEDULED
+  PUBLISHED
+  FAILED_NEEDS_REVIEW
+  CANCELLED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  checkIns MoodCheckIn[]
+}
+
+model MoodCheckIn {
+  id          String             @id @default(cuid())
+  userId      String
+  feelings    String[]
+  intensity   Int
+  inspiration String
+  visualStyle VisualStyle
+  direction   EmotionalDirection
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  poems       Poem[]
+  backgrounds Background[]
+  revisions   ArtworkRevision[]
+  queueJobs   QueueJob[]
+
+  @@index([userId, createdAt])
+}
+
+model Poem {
+  id               String      @id @default(cuid())
+  checkInId        String
+  title            String
+  lines            String[]
+  syllableCounts   Int[]
+  syllableUncertain Boolean    @default(true)
+  caption          String
+  altText          String
+  createdAt        DateTime    @default(now())
+
+  checkIn          MoodCheckIn @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+  revisions        ArtworkRevision[]
+}
+
+model Background {
+  id          String      @id @default(cuid())
+  checkInId   String
+  name        String
+  prompt      String
+  palette     Json
+  style       VisualStyle
+  svgTemplate String
+  createdAt   DateTime    @default(now())
+
+  checkIn     MoodCheckIn @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+  revisions   ArtworkRevision[]
+}
+
+model ArtworkRevision {
+  id                 String         @id @default(cuid())
+  checkInId          String
+  poemId             String
+  backgroundId       String
+  revisionNumber     Int
+  status             RevisionStatus @default(DRAFT)
+  immutableSnapshot  Json
+  typography         Json
+  caption            String
+  altText            String
+  visibility         String         @default("private")
+  scheduledFor       DateTime?
+  approvedAt         DateTime?
+  approvalInvalidatedAt DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  checkIn            MoodCheckIn    @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+  poem               Poem           @relation(fields: [poemId], references: [id])
+  background         Background     @relation(fields: [backgroundId], references: [id])
+  deliveries         DestinationDelivery[]
+  queueJobs          QueueJob[]
+
+  @@unique([checkInId, revisionNumber])
+  @@index([status, scheduledFor])
+}
+
+model Destination {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  label       String
+  state       DestinationState
+  capabilities Json
+  note        String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  deliveries  DestinationDelivery[]
+}
+
+model DestinationDelivery {
+  id             String         @id @default(cuid())
+  revisionId     String
+  destinationId  String
+  status         DeliveryStatus @default(NOT_STARTED)
+  remotePostId   String?
+  attemptToken   String         @unique
+  lastError      String?
+  scheduledFor   DateTime?
+  publishedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  revision       ArtworkRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  destination    Destination     @relation(fields: [destinationId], references: [id])
+
+  @@unique([revisionId, destinationId])
+  @@index([status, scheduledFor])
+}
+
+model QueueJob {
+  id          String      @id @default(cuid())
+  kind        String
+  status      QueueStatus @default(PENDING)
+  checkInId   String?
+  revisionId  String?
+  runAt       DateTime    @default(now())
+  lockedAt    DateTime?
+  attempts    Int         @default(0)
+  payload     Json
+  dedupeKey   String      @unique
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  checkIn     MoodCheckIn? @relation(fields: [checkInId], references: [id], onDelete: Cascade)
+  revision    ArtworkRevision? @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAt])
+}
