@@ -27,6 +27,7 @@ enum RevisionStatus {
   REJECTED
   CANCELLED
   PUBLISHED
+  FAILED
 }
 
 enum QueueStatus {

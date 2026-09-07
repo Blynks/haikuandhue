@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { DestinationState, EmotionalDirection, Prisma, RevisionStatus, VisualStyle } from "@prisma/client";
-import { createSession, clearSession, verifyPassword } from "./auth";
+import { createSession, clearSession, isAuthenticated, verifyPassword } from "./auth";
 import { canUseDatabase, prisma } from "./prisma";
 import { generateBackgrounds, generateHaikus, type CheckInInput } from "./generation";
 import { publishingCapabilities } from "./publishing";
@@ -49,6 +49,22 @@ export async function ensureSeedData() {
   );
 }
 
+async function requireStudioUser() {
+  if (!(await isAuthenticated())) redirect("/login");
+  if (!(await canUseDatabase())) redirect("/?demo=database-required");
+  await ensureSeedData();
+  return prisma.user.findUniqueOrThrow({ where: { email: userEmail } });
+}
+
+async function requireOwnedRevision(revisionId: string) {
+  const user = await requireStudioUser();
+  const revision = await prisma.artworkRevision.findFirstOrThrow({
+    where: { id: revisionId, checkIn: { userId: user.id } },
+    include: { poem: true, background: true, deliveries: true }
+  });
+  return { user, revision };
+}
+
 export async function getStudioSnapshot() {
   if (!(await canUseDatabase())) return demoSnapshot();
   await ensureSeedData();
@@ -63,8 +79,7 @@ export async function getStudioSnapshot() {
 
 export async function createCheckInAction(formData: FormData) {
   if (!(await canUseDatabase())) redirect("/?demo=database-required");
-  await ensureSeedData();
-  const user = await prisma.user.findUniqueOrThrow({ where: { email: userEmail } });
+  const user = await requireStudioUser();
   const input = parseCheckIn(formData);
   const poems = generateHaikus(input);
   const backgrounds = generateBackgrounds(input);
@@ -81,9 +96,10 @@ export async function createCheckInAction(formData: FormData) {
     },
     include: { poems: true, backgrounds: true }
   });
-  for (let index = 0; index < 3; index += 1) {
+  for (let index = 0; index < checkIn.poems.length; index += 1) {
     const poem = checkIn.poems[index];
     const background = checkIn.backgrounds[index];
+    if (!poem || !background) continue;
     await prisma.artworkRevision.create({
       data: {
         checkInId: checkIn.id,
@@ -103,12 +119,14 @@ export async function createCheckInAction(formData: FormData) {
 }
 
 export async function createMixedRevisionAction(formData: FormData) {
+  const user = await requireStudioUser();
   const poemId = String(formData.get("poemId"));
   const backgroundId = String(formData.get("backgroundId"));
   const checkInId = String(formData.get("checkInId"));
-  const [poem, background, count] = await Promise.all([
-    prisma.poem.findUniqueOrThrow({ where: { id: poemId } }),
-    prisma.background.findUniqueOrThrow({ where: { id: backgroundId } }),
+  const [poem, background, , count] = await Promise.all([
+    prisma.poem.findFirstOrThrow({ where: { id: poemId, checkInId } }),
+    prisma.background.findFirstOrThrow({ where: { id: backgroundId, checkInId } }),
+    prisma.moodCheckIn.findFirstOrThrow({ where: { id: checkInId, userId: user.id } }),
     prisma.artworkRevision.count({ where: { checkInId } })
   ]);
   await prisma.artworkRevision.create({
@@ -131,8 +149,14 @@ export async function updateRevisionAction(formData: FormData) {
   const lines = ["line1", "line2", "line3"].map((field) => String(formData.get(field) ?? "").trim()).filter(Boolean);
   const caption = String(formData.get("caption") ?? "").trim();
   const altText = String(formData.get("altText") ?? "").trim();
-  const typography = { family: String(formData.get("family") || "Georgia, serif"), ink: String(formData.get("ink") || "#2f2925"), align: String(formData.get("align") || "center"), scale: Number(formData.get("scale") || 1) };
-  const revision = await prisma.artworkRevision.findUniqueOrThrow({ where: { id: revisionId }, include: { poem: true, background: true, deliveries: true } });
+  const ink = String(formData.get("ink") || "#2f2925");
+  const typography = {
+    family: String(formData.get("family") || "Georgia, serif").slice(0, 80),
+    ink: /^#[0-9a-fA-F]{6}$/.test(ink) ? ink : "#2f2925",
+    align: String(formData.get("align") || "center") === "left" ? "left" : "center",
+    scale: Math.min(1.4, Math.max(0.7, Number(formData.get("scale") || 1)))
+  };
+  const { revision } = await requireOwnedRevision(revisionId);
   await prisma.artworkRevision.update({
     where: { id: revisionId },
     data: {
@@ -153,7 +177,7 @@ export async function approveRevisionAction(formData: FormData) {
   const revisionId = String(formData.get("revisionId"));
   const scheduledFor = new Date(String(formData.get("scheduledFor") || new Date(Date.now() + 60 * 60 * 1000).toISOString()));
   const destinationSlugs = formData.getAll("destinations").map(String);
-  const revision = await prisma.artworkRevision.findUniqueOrThrow({ where: { id: revisionId }, include: { poem: true, background: true } });
+  const { revision } = await requireOwnedRevision(revisionId);
   const destinations = await prisma.destination.findMany({ where: { slug: { in: destinationSlugs.length ? destinationSlugs : ["manual-export"] } } });
   await prisma.$transaction(async (tx) => {
     await tx.artworkRevision.update({
@@ -179,12 +203,14 @@ export async function approveRevisionAction(formData: FormData) {
 }
 
 export async function rejectRevisionAction(formData: FormData) {
-  await prisma.artworkRevision.update({ where: { id: String(formData.get("revisionId")) }, data: { status: RevisionStatus.REJECTED } });
+  const { revision } = await requireOwnedRevision(String(formData.get("revisionId")));
+  await prisma.artworkRevision.update({ where: { id: revision.id }, data: { status: RevisionStatus.REJECTED } });
   revalidatePath("/review");
 }
 
 export async function cancelRevisionAction(formData: FormData) {
   const revisionId = String(formData.get("revisionId"));
+  await requireOwnedRevision(revisionId);
   await prisma.artworkRevision.update({ where: { id: revisionId }, data: { status: RevisionStatus.CANCELLED, deliveries: { updateMany: { where: {}, data: { status: "CANCELLED" } } } } });
   await prisma.queueJob.updateMany({ where: { revisionId, status: "PENDING" }, data: { status: "CANCELLED" } });
   revalidatePath("/almanac");

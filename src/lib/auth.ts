@@ -18,6 +18,7 @@ export function hashPassword(password: string): string {
 export function verifyPassword(password: string): boolean {
   const expected = process.env.APP_PASSWORD_HASH || hashPassword(process.env.APP_PASSWORD || "demo");
   const actual = hashPassword(password);
+  if (expected.length !== actual.length) return false;
   return timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
 }
 
