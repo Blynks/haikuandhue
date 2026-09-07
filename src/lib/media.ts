@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { PrismaClient } from "@prisma/client";
 import { db } from "./db";
 import { assert } from "./domain";
@@ -42,11 +42,24 @@ export async function ownedAsset(ownerId: string, id: string) {
   assert(asset, "Asset not found.", 404);
   return asset;
 }
-export async function saveAsset(ownerId: string, data: Buffer, width: number, height: number, provenance: string, client: PrismaClient = db) {
+export async function deleteStoredAsset(key: string) {
+  assert(/^[a-f0-9-]+\.png$/.test(key), "Invalid asset key.", 500);
+  if (process.env.MEDIA_DRIVER === "s3") {
+    await s3().send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }));
+  } else {
+    await rm(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ root(), key), { force: true });
+  }
+}
+export async function saveAsset(ownerId: string, data: Buffer, width: number, height: number, provenance: string, client: Pick<PrismaClient, "asset"> = db) {
   const key = `${randomUUID()}.png`;
   await write(key, data);
-  return client.asset.create({ data: {
-    ownerId, key, sha256: digest(data), mime: "image/png", width, height, provenance,
-    license: "Procedural studio artwork; no third-party photograph or image model.",
-  } });
+  try {
+    return await client.asset.create({ data: {
+      ownerId, key, sha256: digest(data), mime: "image/png", width, height, provenance,
+      license: "Procedural studio artwork; no third-party photograph or image model.",
+    } });
+  } catch (error) {
+    await deleteStoredAsset(key);
+    throw error;
+  }
 }

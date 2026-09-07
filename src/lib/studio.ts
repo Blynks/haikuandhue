@@ -5,7 +5,7 @@ import {
   assert, checkCounts, clockSchema, defaultGuidance, defaultLocks, guidanceSchema,
   layoutSchema, linesSchema, localDay, localTime, locksSchema, preflight, syllables, timezoneSchema, type Manifest,
 } from "./domain";
-import { manifestDigest, ownedAsset, readAsset, saveAsset } from "./media";
+import { deleteStoredAsset, manifestDigest, ownedAsset, readAsset, saveAsset } from "./media";
 import { renderComposition } from "./render";
 import type { Brief } from "./providers";
 
@@ -185,23 +185,29 @@ export async function prepareReview(ownerId: string, raw: unknown) {
   const [squareBuffer, portraitBuffer] = await Promise.all([
     renderComposition(background, candidate.lines, layout, "square"), renderComposition(background, candidate.lines, layout, "portrait"),
   ]);
-  const [square, portrait] = await Promise.all([
-    saveAsset(ownerId, squareBuffer, 1080, 1080, `Final composition ${candidate.id}`),
-    saveAsset(ownerId, portraitBuffer, 1080, 1350, `Final composition ${candidate.id}`),
-  ]);
-  const manifest: Manifest = {
-    version: 1, candidateId: candidate.id, entryId: candidate.entryId,
-    assets: { square: { id: square.id, hash: square.sha256 }, portrait: { id: portrait.id, hash: portrait.sha256 } },
-    caption: candidate.caption, alt: candidate.alt, destination: "manual", account: "Personal download",
-    visibility: "private handoff", interactions: "not applicable", scheduledAt: scheduledAt.toISOString(), timezone: defaults.timezone,
-    expiresAt: new Date(scheduledAt.getTime() + input.expiryHours * 3600_000).toISOString(),
-    retryPolicy: "manual download only; never social publish",
-  };
-  return ownerTransaction(ownerId, async (tx) => {
-    const current = await tx.dailyEntry.findFirst({ where: { id: candidate.entryId, ownerId } });
-    assert(current?.selectedCandidateId === candidate.id, "The composition changed while rendering. Prepare a fresh review.", 409);
-    return tx.renderReview.create({ data: { ownerId, entryId: candidate.entryId, candidateId: candidate.id, manifest: json(manifest), digest: manifestDigest(manifest) } });
-  });
+  const storedKeys: string[] = [];
+  try {
+    return await ownerTransaction(ownerId, async (tx) => {
+      const current = await tx.dailyEntry.findFirst({ where: { id: candidate.entryId, ownerId } });
+      assert(current?.selectedCandidateId === candidate.id, "The composition changed while rendering. Prepare a fresh review.", 409);
+      const square = await saveAsset(ownerId, squareBuffer, 1080, 1080, `Final composition ${candidate.id}`, tx);
+      storedKeys.push(square.key);
+      const portrait = await saveAsset(ownerId, portraitBuffer, 1080, 1350, `Final composition ${candidate.id}`, tx);
+      storedKeys.push(portrait.key);
+      const manifest: Manifest = {
+        version: 1, candidateId: candidate.id, entryId: candidate.entryId,
+        assets: { square: { id: square.id, hash: square.sha256 }, portrait: { id: portrait.id, hash: portrait.sha256 } },
+        caption: candidate.caption, alt: candidate.alt, destination: "manual", account: "Personal download",
+        visibility: "private handoff", interactions: "not applicable", scheduledAt: scheduledAt.toISOString(), timezone: defaults.timezone,
+        expiresAt: new Date(scheduledAt.getTime() + input.expiryHours * 3600_000).toISOString(),
+        retryPolicy: "manual download only; never social publish",
+      };
+      return tx.renderReview.create({ data: { ownerId, entryId: candidate.entryId, candidateId: candidate.id, manifest: json(manifest), digest: manifestDigest(manifest) } });
+    });
+  } catch (error) {
+    await Promise.all(storedKeys.map(deleteStoredAsset));
+    throw error;
+  }
 }
 export async function approveExport(ownerId: string, reviewId: string, expectedDigest: string) {
   return ownerTransaction(ownerId, async (tx) => {

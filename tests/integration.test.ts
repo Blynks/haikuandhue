@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
-import { readFile, rm } from "node:fs/promises";
+import { readFile, readdir, rm } from "node:fs/promises";
 import { PrismaClient, type CandidateRevision } from "@prisma/client";
 import { PgBoss } from "pg-boss";
 import { db } from "../src/lib/db";
@@ -9,6 +9,8 @@ import { approveExport, cancelApproval, downloadAsset, ensureDefaults, markHando
 import { OUTPUT_QUEUE, processOutput, pumpOutputs, runDaily } from "../src/lib/jobs";
 import { hashToken, ownerFromToken } from "../src/lib/auth";
 import { ownedAsset } from "../src/lib/media";
+import * as media from "../src/lib/media";
+import * as render from "../src/lib/render";
 
 const enabled = !!process.env.TEST_DATABASE_URL;
 const owners: string[] = [];
@@ -152,6 +154,35 @@ describe.skipIf(!enabled)("PostgreSQL owner-scoped studio integration", () => {
     expect((await downloadAsset(id, publication.id, "portrait")).subarray(1, 4).toString()).toBe("PNG");
     expect((await markHandoff(id, publication.id)).state).toBe("manual-handoff");
     expect(network).not.toHaveBeenCalled();
+  });
+  it("does not persist final assets when the selection changes during rendering", async () => {
+    const id = await owner(), c = await composition(id);
+    const files = await readdir(process.env.MEDIA_LOCAL_PATH!);
+    const renderComposition = render.renderComposition;
+    vi.spyOn(render, "renderComposition").mockImplementationOnce(async (...args) => {
+      await revision(id, c, { caption: `${c.caption}\nChanged during render.` });
+      return renderComposition(...args);
+    });
+    await expect(prepareReview(id, { candidateId: c.id, scheduledAt: new Date().toISOString(), expiryHours: 24 })).rejects.toThrow("changed while rendering");
+    expect(await db.asset.count({ where: { ownerId: id } })).toBe(1);
+    expect(await db.renderReview.count({ where: { ownerId: id } })).toBe(0);
+    expect(await readdir(process.env.MEDIA_LOCAL_PATH!)).toEqual(files);
+  });
+  it("rolls back final asset rows and removes files if the second asset fails", async () => {
+    const id = await owner(), c = await composition(id);
+    const files = await readdir(process.env.MEDIA_LOCAL_PATH!);
+    const saveAsset = media.saveAsset;
+    vi.spyOn(media, "saveAsset").mockImplementationOnce(saveAsset).mockRejectedValueOnce(new Error("Storage unavailable"));
+    await expect(prepareReview(id, { candidateId: c.id, scheduledAt: new Date().toISOString(), expiryHours: 24 })).rejects.toThrow("Storage unavailable");
+    expect(await db.asset.count({ where: { ownerId: id } })).toBe(1);
+    expect(await db.renderReview.count({ where: { ownerId: id } })).toBe(0);
+    expect(await readdir(process.env.MEDIA_LOCAL_PATH!)).toEqual(files);
+  });
+  it("removes a stored file when its asset row cannot be created", async () => {
+    const files = await readdir(process.env.MEDIA_LOCAL_PATH!);
+    vi.spyOn(db.asset, "create").mockRejectedValueOnce(new Error("Database unavailable"));
+    await expect(media.saveAsset(randomUUID(), Buffer.from("test"), 1, 1, "Failed test asset")).rejects.toThrow("Database unavailable");
+    expect(await readdir(process.env.MEDIA_LOCAL_PATH!)).toEqual(files);
   });
   it("unused alternatives do not invalidate approval, covered edits always do", async () => {
     const id = await owner(), c = await composition(id), a = await approval(id, c);

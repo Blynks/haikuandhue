@@ -77,7 +77,7 @@ The local HTTP example needs `COOKIE_SECURE=false`. Before exposing the service,
 
 Default: `MEDIA_DRIVER=local`, `MEDIA_LOCAL_PATH=./data/media`. Keep that directory outside `public/`, writable only by the application and worker; back it up with PostgreSQL. Files use random immutable keys and content hashes, and are served only after owner authentication.
 
-For S3-compatible storage set `MEDIA_DRIVER=s3`, `S3_ENDPOINT` (optional for AWS), `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` on **both web and worker**. Configure the bucket to deny public access, no public ACLs, and least-privilege GetObject/PutObject on the application prefix/bucket. The adapter never produces a public object URL. The checked-in Compose configuration intentionally uses a shared local volume; adapt its explicit storage environment for S3. S3 is implemented but requires your real endpoint to verify deployment.
+For S3-compatible storage set `MEDIA_DRIVER=s3`, `S3_ENDPOINT` (optional for AWS), `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` on **both web and worker**. Configure the bucket to deny public access, no public ACLs, and least-privilege GetObject/PutObject/DeleteObject on the application prefix/bucket; deletion is used to clean up failed asset saves and reviews. The adapter never produces a public object URL. The checked-in Compose configuration intentionally uses a shared local volume; adapt its explicit storage environment for S3. S3 is implemented but requires your real endpoint to verify deployment.
 
 ### Optional live text
 
