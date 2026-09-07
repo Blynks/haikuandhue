@@ -125,11 +125,12 @@ CREATE TABLE "QueueJob" (
   "lockedAt" TIMESTAMP(3),
   "attempts" INTEGER NOT NULL DEFAULT 0,
   "payload" JSONB NOT NULL,
+  "dedupeKey" TEXT NOT NULL,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "QueueJob_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "QueueJob_kind_checkInId_revisionId_key" ON "QueueJob"("kind", "checkInId", "revisionId");
+CREATE UNIQUE INDEX "QueueJob_dedupeKey_key" ON "QueueJob"("dedupeKey");
 CREATE INDEX "QueueJob_status_runAt_idx" ON "QueueJob"("status", "runAt");
 ALTER TABLE "QueueJob" ADD CONSTRAINT "QueueJob_checkInId_fkey" FOREIGN KEY ("checkInId") REFERENCES "MoodCheckIn"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "QueueJob" ADD CONSTRAINT "QueueJob_revisionId_fkey" FOREIGN KEY ("revisionId") REFERENCES "ArtworkRevision"("id") ON DELETE CASCADE ON UPDATE CASCADE;

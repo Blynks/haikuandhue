@@ -13,5 +13,5 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const size = (request.nextUrl.searchParams.get("size") === "portrait" ? "portrait" : "square") as RenderSize;
   const typography = revision.typography as { family: string; ink: string; align: "left" | "center"; scale: number };
   const image = await renderArtwork({ backgroundSvg: revision.background.svgTemplate, lines: revision.poem.lines, typography, size });
-  return new Response(image, { headers: { "Content-Type": "image/png", "Content-Disposition": `attachment; filename="haiku-and-hue-${revision.id}-${size}.png"` } });
+  return new Response(new Uint8Array(image), { headers: { "Content-Type": "image/png", "Content-Disposition": `attachment; filename="haiku-and-hue-${revision.id}-${size}.png"` } });
 }

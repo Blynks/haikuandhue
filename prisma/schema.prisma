@@ -182,12 +182,12 @@ model QueueJob {
   lockedAt    DateTime?
   attempts    Int         @default(0)
   payload     Json
+  dedupeKey   String      @unique
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   checkIn     MoodCheckIn? @relation(fields: [checkInId], references: [id], onDelete: Cascade)
   revision    ArtworkRevision? @relation(fields: [revisionId], references: [id], onDelete: Cascade)
 
-  @@unique([kind, checkInId, revisionId])
   @@index([status, runAt])
 }
