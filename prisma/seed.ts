@@ -1,6 +1,6 @@
 import { DestinationState, EmotionalDirection, PrismaClient, RevisionStatus, VisualStyle } from "@prisma/client";
 import { generateBackgrounds, generateHaikus } from "../src/lib/generation";
-import { publishingCapabilities } from "../src/lib/publishing";
+import { publishingCapabilities, toDestinationState } from "../src/lib/publishing";
 
 const prisma = new PrismaClient();
 
@@ -9,8 +9,8 @@ async function main() {
   for (const capability of publishingCapabilities) {
     await prisma.destination.upsert({
       where: { slug: capability.slug },
-      update: { label: capability.label, state: capability.state.toUpperCase().replace("-", "_") as DestinationState, capabilities: capability, note: capability.note },
-      create: { slug: capability.slug, label: capability.label, state: capability.state.toUpperCase().replace("-", "_") as DestinationState, capabilities: capability, note: capability.note }
+      update: { label: capability.label, state: toDestinationState(capability.state) as DestinationState, capabilities: capability, note: capability.note },
+      create: { slug: capability.slug, label: capability.label, state: toDestinationState(capability.state) as DestinationState, capabilities: capability, note: capability.note }
     });
   }
   const input = { feelings: ["calm", "hopeful"], intensity: 6, inspiration: "seeded moonlight on paper", visualStyle: "PAPER_GARDEN" as const, direction: "LIFT" as const };

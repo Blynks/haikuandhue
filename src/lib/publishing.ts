@@ -49,3 +49,7 @@ export const manualExportAdapter: PublishingAdapter = {
     return { copyCaption: input.caption, downloadUrl: input.imageUrl, altText: input.altText };
   }
 };
+
+export function toDestinationState(state: DestinationState): "PLANNED" | "CONNECTED" | "BLOCKED" | "MANUAL_EXPORT" {
+  return state.toUpperCase().replace("-", "_") as "PLANNED" | "CONNECTED" | "BLOCKED" | "MANUAL_EXPORT";
+}

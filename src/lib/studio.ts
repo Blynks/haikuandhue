@@ -6,7 +6,7 @@ import { DestinationState, EmotionalDirection, Prisma, RevisionStatus, VisualSty
 import { createSession, clearSession, isAuthenticated, verifyPassword } from "./auth";
 import { canUseDatabase, prisma } from "./prisma";
 import { generateBackgrounds, generateHaikus, type CheckInInput } from "./generation";
-import { publishingCapabilities } from "./publishing";
+import { publishingCapabilities, toDestinationState } from "./publishing";
 import { enqueueUnique } from "./queue";
 
 const userEmail = "studio@haikuandhue.local";
@@ -33,14 +33,14 @@ export async function ensureSeedData() {
         where: { slug: capability.slug },
         update: {
           label: capability.label,
-          state: capability.state.toUpperCase().replace("-", "_") as DestinationState,
+          state: toDestinationState(capability.state) as DestinationState,
           capabilities: capability as unknown as Prisma.InputJsonValue,
           note: capability.note
         },
         create: {
           slug: capability.slug,
           label: capability.label,
-          state: capability.state.toUpperCase().replace("-", "_") as DestinationState,
+          state: toDestinationState(capability.state) as DestinationState,
           capabilities: capability as unknown as Prisma.InputJsonValue,
           note: capability.note
         }
@@ -181,9 +181,10 @@ export async function approveRevisionAction(formData: FormData) {
   const revisionId = String(formData.get("revisionId"));
   const requestedSchedule = new Date(String(formData.get("scheduledFor") || ""));
   const scheduledFor = Number.isNaN(requestedSchedule.getTime()) ? new Date(Date.now() + 60 * 60 * 1000) : requestedSchedule;
-  const destinationSlugs = formData.getAll("destinations").map(String);
+  const rawDestinationSlugs = formData.getAll("destinations").map(String);
+  const destinationSlugs = rawDestinationSlugs.length ? rawDestinationSlugs : ["manual-export"];
   const { revision } = await requireOwnedRevision(revisionId);
-  const destinations = await prisma.destination.findMany({ where: { slug: { in: destinationSlugs.length ? destinationSlugs : ["manual-export"] } } });
+  const destinations = await prisma.destination.findMany({ where: { slug: { in: destinationSlugs } } });
   await prisma.$transaction(async (tx) => {
     await tx.artworkRevision.update({
       where: { id: revisionId },
@@ -245,5 +246,5 @@ function demoSnapshot() {
   const poems = generateHaikus(input).map((poem, index) => ({ id: `demo-poem-${index}`, ...poem }));
   const backgrounds = generateBackgrounds(input).map((background, index) => ({ id: `demo-background-${index}`, style: input.visualStyle, ...background }));
   const revisions = poems.map((poem, index) => ({ id: `demo-revision-${index}`, revisionNumber: index + 1, status: "DRAFT", caption: poem.caption, altText: poem.altText, scheduledFor: null, poem, background: backgrounds[index], deliveries: [] }));
-  return { demoMode: true, today: { id: "demo-check-in", feelings: input.feelings, intensity: input.intensity, inspiration: input.inspiration, visualStyle: input.visualStyle, direction: input.direction, poems, backgrounds, revisions }, revisions, destinations: publishingCapabilities.map((capability) => ({ id: capability.slug, slug: capability.slug, label: capability.label, state: capability.state.toUpperCase().replace("-", "_"), note: capability.note })), reminder: false };
+  return { demoMode: true, today: { id: "demo-check-in", feelings: input.feelings, intensity: input.intensity, inspiration: input.inspiration, visualStyle: input.visualStyle, direction: input.direction, poems, backgrounds, revisions }, revisions, destinations: publishingCapabilities.map((capability) => ({ id: capability.slug, slug: capability.slug, label: capability.label, state: toDestinationState(capability.state), note: capability.note })), reminder: false };
 }
